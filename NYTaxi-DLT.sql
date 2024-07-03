@@ -1,8 +1,9 @@
 -- Databricks notebook source
--- bronze table for ingestion of 22k NY taxi rides from
--- samples.nyctaxi data set
+-- this example is based on the samples.nyctaxi data set
+-- data set is available at kaggle, https://www.kaggle.com/c/nyc-taxi-trip-duration/data
 
--- DLT data quality expectation drop trips without a trip distance
+-- bronze table for ingestion of the 22k NY taxi rides from
+-- with DLT data quality expectation to drop trips without a trip distance
 
 CREATE OR REFRESH STREAMING TABLE taxi_raw_records 
 (CONSTRAINT valid_distance EXPECT (trip_distance > 0.0) ON VIOLATION DROP ROW ) 
@@ -11,13 +12,11 @@ AS SELECT
 FROM
   STREAM(samples.nyctaxi.trips)
 
--- data set is available at kaggle, https://www.kaggle.com/c/nyc-taxi-trip-duration/data
 
 
 -- COMMAND ----------
 
 -- silver layer: data transformations and cleansing
-
 -- we look into short trips or trips within the same zip code that cost more than $50
 
 CREATE OR REFRESH STREAMING TABLE flagged_rides 
@@ -31,13 +30,7 @@ WHERE   ((pickup_zip = dropoff_zip AND fare_amount > 50) OR
         (trip_distance < 5 AND fare_amount > 50))
 
 
-
--- COMMAND ----------
-
--- silver layer, cleansing, and aggregations
-
--- calculates avg fares and trip distances for each week
-
+-- calculate avg fares and trip distances for each week
 CREATE
 OR REFRESH MATERIALIZED VIEW weekly_stats
 AS SELECT
@@ -52,7 +45,7 @@ ORDER by week ASC
 
 -- COMMAND ----------
 
--- materialized view in gold layer, read optimized for downstream usage, e.g. BI
+-- gold layer using materialized for downstream usage, e.g. BI
 
 -- join weely_stats with flagged_rides for top n rides to investigate
 -- display top n short distance and costly rides
